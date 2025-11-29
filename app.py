@@ -154,6 +154,10 @@ class QuizSolver:
                     data['submit_url'] = urljoin(base_url, raw_url.strip())
                     break
         
+        # FALLBACK: If no submit URL found, use default for this domain
+        if not data['submit_url'] and 'tds-llm-analysis' in base_url:
+            data['submit_url'] = 'https://tds-llm-analysis.s-anand.net/submit'
+        
         # 2. Extract URLs
         all_urls = re.findall(r'(https?://[^\s<>"\']+)', text)
         relative_urls = re.findall(r'href=["\']([^"\']+)["\']', text)
@@ -276,6 +280,7 @@ The user's question may involve fetching data, cleaning data, joining data, math
     * **IF** the question asks to "Calculate X", print ONLY the number X.
     * **IF** the question asks to "Scrape Y", print ONLY the content of Y.
     * **IF** the script makes a POST request to solve the task (like the demo), print the success message or relevant data, NOT the entire response object unless requested.
+    * **IF** the question asks for a command string (like "uv http get ..."), DO NOT add extra quotes around URLs. Match the exact format requested.
 
 5.  **Visualization:**
     * If asked for a chart/plot, use `matplotlib.pyplot`. Save the plot to a BytesIO buffer, encode as Base64, and print the Data URI (`data:image/png;base64,...`).
@@ -471,8 +476,12 @@ def handle_quiz():
         if not url:
             return jsonify({"error": "Missing 'url' parameter"}), 400
             
-        # Run quiz solver asynchronously
-        asyncio.create_task(solve_quiz_async(url))
+        # Run quiz solver in background thread
+        import threading
+        thread = threading.Thread(target=lambda: asyncio.run(solve_quiz_async(url)))
+        thread.daemon = True
+        thread.start()
+        
         return jsonify({"status": "started", "url": url}), 200
     except Exception as e: 
         return jsonify({"error": str(e)}), 500
@@ -501,10 +510,13 @@ async def solve_quiz_async(url: str):
     finally:
         await solver.close_browser()
 
+# ==========================================
+# MAIN ENTRY POINT
+# ==========================================
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         if sys.argv[1] == 'test':
-            asyncio.run(solve_quiz_async("https://tds.s-anand.net/#/project-llm-analysis-quiz"))
+            asyncio.run(solve_quiz_async("https://tds-llm-analysis.s-anand.net/demo"))
         elif sys.argv[1] == 'defense':
             test_defense()
         elif sys.argv[1] == 'attack':
