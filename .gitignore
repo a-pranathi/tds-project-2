@@ -47,4 +47,13 @@ temp_*
 Thumbs.db
 
 # Logs
+
 *.log
+
+*.py[oc]
+*.egg-info
+.env
+# Virtual environments
+.venv
+tests
+LLMFiles
